@@ -993,7 +993,7 @@ function viewHome(){
       <p class="sec-intro">Sin registrarte ni pagar online: el pedido se envía por WhatsApp.</p>
       <ol class="pasos">
         <li><h3>Elige en la carta</h3><p>Añade tus platos. Verás al instante si el local está abierto o si debes programar el pedido.</p></li>
-        <li><h3>Rellena tus datos</h3><p>Nombre, teléfono, email y dirección.</p></li>
+        <li><h3>Rellena tus datos</h3><p>Nombre, teléfono y dirección. El correo es opcional.</p></li>
         <li><h3>Envíalo por WhatsApp</h3><p>Se abre el chat con tu pedido ya escrito. Pulsa enviar y te confirmamos el horario estimado por ahí.</p></li>
       </ol>
     </div>
@@ -1197,7 +1197,7 @@ const campos=['nombre','tel','email','dir','notas'];
 const validar={
   nombre:v=>{const p=v.trim().split(/\s+/).filter(x=>x.length>1);return p.length>=2?'':'Escribe tu nombre y apellido'},
   tel:v=>/^\+?\d{9,15}$/.test(v.replace(/[\s.\-()]/g,''))?'':'Escribe un teléfono válido (9 a 15 cifras)',
-  email:v=>/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim())?'':'Escribe un correo válido, por ejemplo nombre@correo.com',
+  email:v=>!v.trim()||/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim())?'':'Escribe un correo válido, por ejemplo nombre@correo.com',
   dir:v=>F.modo==='domicilio'?(v.trim().length>=8?'':'Escribe la dirección de entrega con calle, número y piso'):''
 };
 function resumenHTML(){
@@ -1231,7 +1231,7 @@ function viewPedido(){
       <div class="campo"><label for="nombre">Nombre y apellido</label><input class="in" id="nombre" name="nombre" autocomplete="name" required aria-describedby="e-nombre"><p class="err" id="e-nombre" hidden></p></div>
       <div class="dosc" style="margin-top:0">
        <div class="campo"><label for="tel">Teléfono</label><input class="in" id="tel" name="tel" type="tel" inputmode="tel" autocomplete="tel" required aria-describedby="e-tel"><p class="err" id="e-tel" hidden></p></div>
-       <div class="campo"><label for="email">Correo electrónico</label><input class="in" id="email" name="email" type="email" inputmode="email" autocomplete="email" required aria-describedby="e-email"><p class="err" id="e-email" hidden></p></div>
+       <div class="campo"><label for="email">Correo electrónico <span>(opcional)</span></label><input class="in" id="email" name="email" type="email" inputmode="email" autocomplete="email" aria-describedby="e-email"><p class="err" id="e-email" hidden></p></div>
       </div>
       <div class="campo" style="margin-top:16px"><label for="dir"><span id="dir-et">Dirección</span></label><input class="in" id="dir" name="dir" autocomplete="street-address" aria-describedby="e-dir"><p class="err" id="e-dir" hidden></p></div>
       <div class="campo"><label for="notas">Alergias o comentarios <span>(opcional)</span></label><textarea class="in" id="notas" name="notas" rows="2" placeholder="Por ejemplo: alergia a frutos secos, sin wasabi…"></textarea></div>
@@ -1290,7 +1290,8 @@ function validarCampo(c){
 function enviar(e){
   e.preventDefault();
   const errs=[];
-  ['nombre','tel','email','dir'].forEach(c=>{const m=validarCampo(c);if(m)errs.push([c,m])});
+  ['nombre','tel','dir'].forEach(c=>{const m=validarCampo(c);if(m)errs.push([c,m])});
+  if($('#email').value.trim()){const m=validarCampo('email');if(m)errs.push(['email',m])}
   const cons=$('#consent').checked;
   if(!cons){const er=$('#e-consent');er.textContent='Para enviar el pedido debes aceptar el tratamiento de tus datos';er.hidden=false;$('#consent-box').classList.add('malo');errs.push(['consent','Acepta la política de privacidad y los términos'])}
   const st=estado(),opts=opcionesProgramar();
@@ -1309,7 +1310,7 @@ function enviar(e){
   const cuando=prog?`Programado: ${op.label.replace(' · ',', ')} a las ${hm(F.hora)} (hora deseada, pendiente de confirmar)`:'Lo antes posible (confirmar horario estimado)';
   const modo=F.modo==='domicilio'?'A domicilio':'Recoger en el local';
   const v=c=>($('#'+c).value||'').trim();
-  const lineas=cart.map(l=>{const it=ITEMS[l.id],det=lineDetail(l);const precio=it.poke?eur(unit(l)*l.qty):eur2(unit(l)*l.qty);const cab=it.poke?`${l.qty}x ${lineTitle(l)} - ${precio}`:`${l.qty} x ${lineTitle(l)} — ${precio}`;return cab+(det.length?'\n'+det.map(d=>'   · '+d).join('\n'):'')}).join('\n');
+  const lineas=cart.map(l=>{const it=ITEMS[l.id];const precio=it.poke?eur(unit(l)*l.qty):eur2(unit(l)*l.qty);if(it.poke){const variante=it.v[l.vi||0],lab=variante.l.replace(/ · /g,' - '),sel=l.sel||{},det=[];variante.prs.forEach((_,k)=>{const p=sel['prot'+(k+1)]||[],g=sel['veg'+(k+1)]||[];if(p.length)det.push(`   · Poke ${k+1}: ${fmtSel(p)}`);if(g.length)det.push(`   Vegetales: ${fmtSel(g)}`)});return `${l.qty}x Poke (${lab}) - ${precio}`+(det.length?'\n'+det.join('\n'):'')}const det=lineDetail(l);const cab=`${l.qty} x ${lineTitle(l)} — ${precio}`;return cab+(det.length?'\n'+det.map(d=>'   · '+d).join('\n'):'')}).join('\n');
   const msg=`*NUEVO PEDIDO WEB · Karoli *\nRef: ${ref}\n\n*Cuándo:* ${cuando}\n*Entrega:* ${modo}\n\n*Pedido*\n${lineas}\n\n*Total: ${eur2(totalCart())}* (IVA incl.)\n\n*Cliente*\nNombre: ${v('nombre')}\nTeléfono: ${v('tel')}\nDirección: ${v('dir')||'—'}\nAlergias/comentarios: ${v('notas')||'—'}\n\nPor favor, confirmen el horario estimado por WhatsApp.`;
   const url=`https://wa.me/${CFG.whatsapp}?text=${encodeURIComponent(msg)}`;
   const last={ref,cuando,modo,url,total:totalCart(),nombre:v('nombre'),lineas:cart.map(l=>({t:lineTitle(l),q:l.qty,p:unit(l)*l.qty,d:lineDetail(l)}))};
