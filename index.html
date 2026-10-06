@@ -1341,7 +1341,9 @@ function viewGracias(){
 }
 
 /* =====================  CATERING  ===================== */
-const MAIL_CAT='leonardorisi11@gmail.com';
+/* Web3Forms: pega aquí la Access Key que recibirás al verificar el correo de destino. */
+const WEB3FORMS_KEY='2772888f-ad36-4919-8c8d-9661f87a60b1';
+const WEB3FORMS_ENDPOINT='https://api.web3forms.com/submit';
 let CT=null;
 function mananaISO(){const n=ahora();return new Date(Date.UTC(n.y,n.m-1,n.d+1)).toISOString().slice(0,10)}
 function horasOpts(){let o='<option value="">Elige hora</option>';for(let m=8*60;m<=23*60+30;m+=30)o+=`<option value="${hm(m)}">${hm(m)}</option>`;return o}
@@ -1350,7 +1352,7 @@ function viewCatering(){
   app.innerHTML=`<div class="wrap"><a class="volver" href="#/">← Volver al inicio</a>
   <form class="catering" id="cform" novalidate>
    <h1>Catering para eventos</h1>
-   <p class="lead">Cuéntanos tu evento y te preparamos una cotización. Rellena el formulario y envíanoslo por el medio que prefieras: correo o WhatsApp.</p>
+   <p class="lead">Cuéntanos tu evento y te preparamos una cotización. Puedes enviar la solicitud directamente desde esta página o, si lo prefieres, por WhatsApp.</p>
    <div id="cerr"></div>
    <div class="caja"><h2>Datos de contacto</h2>
     <div class="campo"><label for="c-nombre">Nombre y apellido del responsable</label><input class="in" id="c-nombre" autocomplete="name" required aria-describedby="ce-nombre"><p class="err" id="ce-nombre" hidden></p></div>
@@ -1373,10 +1375,10 @@ function viewCatering(){
    </div>
    <div class="consent" id="c-consent-box"><input type="checkbox" id="c-consent" aria-describedby="ce-consent"><label for="c-consent">He leído la <a href="#/legal/privacidad" target="_blank" rel="noopener">política de privacidad</a>. Acepto que Karoli Sushi Aravaca use estos datos para responder a mi solicitud de catering.</label></div>
    <p class="err" id="ce-consent" hidden></p>
-   <div class="caja envio"><h2>¿Cómo quieres enviar la solicitud?</h2>
-    <p class="nota" style="margin:0 0 14px">Elige el medio con el que prefieres recibir la cotización. Se abrirá con tu solicitud ya escrita.</p>
+   <div class="caja envio"><h2>Enviar solicitud</h2>
+    <p class="nota" style="margin:0 0 14px">La opción principal envía el formulario directamente a Karoli sin abrir ninguna aplicación de correo. También puedes enviarlo por WhatsApp.</p>
     <div class="botones">
-     <button class="btn btn-negro" type="button" data-act="cat-mail">${ico.mail}Enviar por correo</button>
+     <button class="btn btn-negro" id="cat-send" type="button" data-act="cat-mail">${ico.mail}Enviar solicitud</button>
      <button class="btn btn-wa" type="button" data-act="cat-wa">${ico.wa}Enviar por WhatsApp</button>
     </div>
    </div>
@@ -1404,7 +1406,7 @@ function catValidar(){
 function catTexto(d){
   return `*SOLICITUD DE CATERING · Karoli Sushi Aravaca*\n\n*Responsable:* ${d.nombre}\n*Empresa:* ${d.empresa||'—'}\n*Teléfono:* ${d.tel}\n*Correo:* ${d.email}\n\n*Fecha del evento:* ${fechaLarga(d.fecha)}\n*Horario:* de ${d.ini} a ${d.fin}\n*Personas:* ${d.pers}\n*Piezas estimadas:* ${d.pzs}\n\n*Solicitud a cotizar:*\n${d.desc}\n\nHe aceptado la política de privacidad.`;
 }
-function catEnviar(via){
+async function catEnviar(via){
   const errs=catValidar(),box=$('#cerr');
   if(errs.length){
     box.innerHTML=`<div class="errorres" role="alert">Revisa estos puntos para enviar tu solicitud:<ul>${errs.map(x=>`<li>${esc(x[1])}</li>`).join('')}</ul></div>`;
@@ -1414,18 +1416,67 @@ function catEnviar(via){
   const g=k=>($('#c-'+k).value||'').trim();
   const d={nombre:g('nombre'),empresa:g('empresa'),tel:g('tel'),email:g('email'),fecha:g('fecha'),ini:g('ini'),fin:g('fin'),pers:g('pers'),pzs:g('pzs'),desc:g('desc')};
   CT={via,d,texto:catTexto(d)};
-  catAbrir();
-  $('#cat-ok').innerHTML=`<div class="aviso-wa"><b>Solicitud preparada por ${via==='mail'?'correo':'WhatsApp'}.</b>Revisa el mensaje y pulsa «Enviar» en ${via==='mail'?'tu aplicación de correo':'WhatsApp'}. Te responderemos con la cotización. ¿No se abrió?
-    <div class="acc" style="margin:12px 0 0"><button class="btn btn-negro sm" type="button" data-act="cat-again">Abrir de nuevo</button><button class="btn btn-borde sm" type="button" data-act="cat-copy">Copiar solicitud</button></div></div>`;
-  $('#cat-ok').scrollIntoView({block:'center',behavior:'smooth'});
+
+  if(via==='wa'){
+    catAbrir();
+    $('#cat-ok').innerHTML=`<div class="aviso-wa"><b>Solicitud preparada para WhatsApp.</b>Revisa el mensaje y pulsa «Enviar» en WhatsApp. Te responderemos con la cotización. ¿No se abrió?
+      <div class="acc" style="margin:12px 0 0"><button class="btn btn-negro sm" type="button" data-act="cat-again">Abrir de nuevo</button><button class="btn btn-borde sm" type="button" data-act="cat-copy">Copiar solicitud</button></div></div>`;
+    $('#cat-ok').scrollIntoView({block:'center',behavior:'smooth'});
+    return;
+  }
+
+  if(!WEB3FORMS_KEY || WEB3FORMS_KEY==='2772888f-ad36-4919-8c8d-9661f87a60b1'){
+    $('#cat-ok').innerHTML=`<div class="errorres" role="alert"><b>Falta conectar Web3Forms.</b><br>Pega la Access Key en la constante <code>WEB3FORMS_KEY</code> del HTML. El resto del formulario ya está configurado.</div>`;
+    $('#cat-ok').scrollIntoView({block:'center',behavior:'smooth'});
+    return;
+  }
+
+  const btn=$('#cat-send');
+  const original=btn?btn.innerHTML:'';
+  if(btn){btn.disabled=true;btn.innerHTML='Enviando…'}
+
+  const payload={
+    access_key:WEB3FORMS_KEY,
+    subject:`Nueva solicitud de catering · ${d.nombre} · ${fechaLarga(d.fecha)}`,
+    from_name:'Karoli Sushi Aravaca · Web',
+    name:d.nombre,
+    email:d.email,
+    telefono:d.tel,
+    empresa:d.empresa||'—',
+    fecha_evento:fechaLarga(d.fecha),
+    hora_inicio:d.ini,
+    hora_fin:d.fin,
+    personas:d.pers,
+    piezas_estimadas:d.pzs,
+    solicitud:d.desc,
+    consentimiento_privacidad:'Sí'
+  };
+
+  try{
+    const res=await fetch(WEB3FORMS_ENDPOINT,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Accept':'application/json'},
+      body:JSON.stringify(payload)
+    });
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok || data.success===false)throw new Error(data.message||'No se pudo enviar');
+
+    $('#cat-ok').innerHTML=`<div class="aviso-wa"><b>Solicitud enviada correctamente.</b>Karoli ha recibido los datos de tu evento. Te responderemos con la cotización lo antes posible.</div>`;
+    $('#cat-ok').scrollIntoView({block:'center',behavior:'smooth'});
+    const form=$('#cform');
+    form&&form.reset();
+    CT=null;
+  }catch(err){
+    console.error('Web3Forms:',err);
+    $('#cat-ok').innerHTML=`<div class="errorres" role="alert"><b>No se pudo enviar la solicitud.</b><br>Comprueba tu conexión e inténtalo de nuevo. Si continúa fallando, puedes enviarla por WhatsApp.</div>`;
+    $('#cat-ok').scrollIntoView({block:'center',behavior:'smooth'});
+  }finally{
+    if(btn){btn.disabled=false;btn.innerHTML=original}
+  }
 }
 function catAbrir(){
   if(!CT)return;
-  if(CT.via==='mail'){
-    const asunto=`Solicitud de catering · ${CT.d.nombre} · ${fechaLarga(CT.d.fecha)}`;
-    const cuerpo=CT.texto.replace(/\*/g,'');
-    const a=document.createElement('a');a.href=`mailto:${MAIL_CAT}?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`;document.body.appendChild(a);a.click();a.remove();
-  }else{window.open(`https://wa.me/${CFG.whatsapp}?text=${encodeURIComponent(CT.texto)}`,'_blank','noopener')}
+  if(CT.via==='wa')window.open(`https://wa.me/${CFG.whatsapp}?text=${encodeURIComponent(CT.texto)}`,'_blank','noopener');
 }
 function catCopiar(){
   if(!CT)return;const t=CT.texto.replace(/\*/g,'');
